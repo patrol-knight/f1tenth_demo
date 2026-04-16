@@ -1,0 +1,74 @@
+<launch>
+  <log message="f1tenth_launch start"/>
+  <!-- Essential Parameters -->
+  <arg name="use_sim_time" default="false"/>
+  <arg name="map_yaml" default="$(find-pkg-share f1tenth_launch)/maps/tepper/map_0201.yaml"/>
+
+  <!-- Optional Parameters -->
+  <arg name="launch_system" default="true" description="launch system"/>
+  <arg name="launch_localization" default="true" description="launch localization"/>
+  <arg name="launch_interface" default="true" description="launch interface"/>
+  <arg name="launch_planning" default="true" description="launch planning"/>
+  <arg name="launch_control" default="true" description="launch control"/>
+  <!-- Localization -->
+  <arg name="pf_localize_config" default="$(find-pkg-share f1tenth_launch)/config/localize.yaml"/>
+  <!-- Planning -->
+  <arg name="pp_path_planning_config" default="$(find-pkg-share f1tenth_launch)/config/path_planning_param.yaml"/>
+  <!-- Planning -->
+  <arg name="pp_pure_pursuit_config" default="$(find-pkg-share f1tenth_launch)/config/pure_pursuit_params.yaml"/>
+  <!-- RViz -->
+  <arg name="launch_rviz" default="true" description="launch rviz"/>
+  <arg name="rviz_respawn" default="false"/>
+  <arg name="rviz_config" default="$(find-pkg-share f1tenth_launch)/rviz/default.rviz"/>
+
+  <!-- RViz -->
+  <group if="$(var launch_rviz)">
+    <node
+      pkg="rviz2"
+      exec="rviz2"
+      name="rviz2"
+      output="screen"
+      args="-d $(var rviz_config)"
+      respawn="$(var rviz_respawn)"
+    />
+  </group>
+
+  <!-- f1tenth_stack -->
+  <group if="$(var launch_system)">
+    <include file="$(find-pkg-share f1tenth_stack)/launch/bringup_launch.py"/>
+  </group>
+
+  <!-- particle_filter -->
+  <group if="$(var launch_localization)">
+    <include file="$(find-pkg-share particle_filter)/launch/localize_launch.py">
+      <arg name="use_sim_time" value="$(var use_sim_time)"/>
+      <arg name="map_yaml" value="$(var map_yaml)"/>
+      <arg name="localize_config" value="$(var pf_localize_config)"/>
+    </include>
+  </group>
+
+  <!-- rosbridge server -->
+  <node
+    pkg="rosbridge_server"
+    exec="rosbridge_websocket"
+    name="rosbridge_websocket">
+    
+    <param name="port" value="9090"/>
+    <param name="address" value="0.0.0.0"/>
+  </node>
+
+  <!-- Path Planning -->
+  <group if="$(var launch_planning)">
+    <include file="$(find-pkg-share path_planning)/launch/path_planning_launch.py">
+      <arg name="path_planning_config" value="$(var pp_path_planning_config)"/>
+    </include>
+  </group>
+
+  <!-- Pure Pursuit -->
+  <group if="$(var launch_control)">
+    <include file="$(find-pkg-share pure_pursuit)/launch/pure_pursuit_launch.py">
+      <arg name="pure_pursuit_config" value="$(var pp_pure_pursuit_config)"/>
+    </include>
+  </group>
+
+</launch>
