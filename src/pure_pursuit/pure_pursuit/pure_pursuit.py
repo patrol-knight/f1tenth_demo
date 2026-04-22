@@ -97,6 +97,55 @@ def pure_pursuit(
 
     return la_pt.copy(), float(curvature)
 
+def compute_cross_track_error(
+    path: Sequence[Sequence[float]],
+    curr_x: float, curr_y:float
+) -> float:
+    """
+    Compute cross-track error as the minimum Euclidean distance from a point
+    to the piecewise-linear path.
+    """
+    path_arr = np.asarray(path, dtype=float)
+    point_arr = np.array([curr_x, curr_y])
+    if path_arr.ndim != 2 or path_arr.shape[1] != 2:
+        raise ValueError("path must be Nx2 array-like of (x,y), currently has shape " + str(path_arr.shape))
+
+    if len(path_arr) == 0:
+        raise ValueError("path must not be empty")
+
+
+    
+    dist_sq = np.sum((path_arr-point_arr)**2, axis = 1)
+    closest_idx = np.argmin(dist_sq)
+
+    candidate_segment = []
+    if closest_idx > 0:
+        candidate_segment.append((closest_idx - 1, closest_idx))
+    if closest_idx < len(path_arr) - 1:
+        candidate_segment.append((closest_idx, closest_idx + 1))
+
+
+    min_dist = float('inf')
+    for start_idx, end_idx in candidate_segment:
+        A = path_arr[start_idx]
+        B = path_arr[end_idx]
+        ab = B-A
+        ap = point_arr - A
+        seg_len_sq = np.dot(ab,ab)
+
+        if seg_len_sq == 0 :
+            dist = np.linalg.norm(point_arr - A)
+        else:
+            t = np.dot(ap,ab)/seg_len_sq
+            t = np.clip(t, 0.0, 1.0)
+            closest_on_seg = A + t*ab
+            dist = np.linalg.norm(point_arr - closest_on_seg)
+
+        if dist < min_dist:
+            min_dist = dist
+        
+    return float(min_dist)
+
 
 class PurePursuitNode(Node):
     """
@@ -125,6 +174,8 @@ class PurePursuitNode(Node):
         # ---- Internal state ----
         self._path_xy: Optional[np.ndarray] = None 
         self._state: Optional[Odometry] = None
+        self._cte_m: Optional[float] = None
+        self._max_abs_cte_m: float = 0.0
 
         # ---- ROS interfaces ----
         self._path_sub = self.create_subscription(Path, "/planning/path", self._on_path, 10)
@@ -174,10 +225,14 @@ class PurePursuitNode(Node):
 
         if len(pts) == 0:
             self._path_xy = None
+            self._cte_m = None
+            self._max_abs_cte_m = 0.0
             self.get_logger().warn("Received empty path.")
             return
 
         self._path_xy = np.asarray(pts, dtype=float)
+        self._cte_m = None
+        self._max_abs_cte_m = 0.0
 
     def _on_odom(self, msg: Odometry) -> None:
         # Pose2D: x, y, theta (theta expected in radians)
@@ -191,9 +246,16 @@ class PurePursuitNode(Node):
             )
             return
 
-        goal_pt = self._path_xy[-1]
         curr_x = self._state.pose.pose.position.x
         curr_y = self._state.pose.pose.position.y
+        self._cte_m = compute_cross_track_error(self._path_xy, curr_x, curr_y)
+        self._max_abs_cte_m = max(self._max_abs_cte_m, abs(self._cte_m))
+
+        self.get_logger().info(
+            f"CTE={self._cte_m * 100.0:.2f} cm, max CTE={self._max_abs_cte_m * 100.0:.2f} cm"
+        )
+
+        goal_pt = self._path_xy[-1]
 
         dist_to_goal = np.sqrt((goal_pt[0] - curr_x)**2 + (goal_pt[1] - curr_y)**2)
         
