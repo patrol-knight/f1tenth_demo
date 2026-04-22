@@ -1,6 +1,6 @@
 pure_pursuit_node:
   ros__parameters:
-    lookahead: 0.25
+    lookahead: 0.1
     wheelbase: 0.30
     control_rate_hz: 20.0
     max_steer_deg: 30.0
