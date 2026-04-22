@@ -97,6 +97,7 @@ def pure_pursuit(
 
     return la_pt.copy(), float(curvature)
 
+
 def compute_cross_track_error(
     path: Sequence[Sequence[float]],
     curr_x: float, curr_y:float
@@ -178,7 +179,7 @@ class PurePursuitNode(Node):
         self._max_abs_cte_m: float = 0.0
 
         # ---- ROS interfaces ----
-        self._path_sub = self.create_subscription(Path, "/planning/path", self._on_path, 10)
+        self._path_sub = self.create_subscription(Path, "/planning/raw_path", self._on_path, 10)
         self._state_sub = self.create_subscription(Odometry, "/pf/pose/odom", self._on_odom, 10)
         self._drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
         self._marker_pub = self.create_publisher(Marker, "/viz/lookahead_point", 10)
@@ -278,6 +279,9 @@ class PurePursuitNode(Node):
         # delta = atan(L * kappa)
         delta_rad = float(np.arctan(self.wheelbase * kappa))
         max_steer_rad = np.radians(self.max_steer_deg)
+        delta_rad = np.clip(delta_rad, -max_steer_rad, max_steer_rad)
+        # Prepare Ackermann message
+        delta_rad = np.clip(delta_rad, -max_steer_rad, max_steer_rad)
         delta_rad = np.clip(delta_rad, -max_steer_rad, max_steer_rad)
         # Prepare Ackermann message
         drive_msg = AckermannDriveStamped()
