@@ -1,30 +1,21 @@
-map_inflator_node:
+planner_node:
   ros__parameters:
-    # Input map topic from map server
-    input_map_topic: "/map"
-    
-    # Output inflated cost map topic
-    output_map_topic: "/cost_map"
-    
-    # Inflation radius in meters
-    # Used to expand occupied cells by this distance
-    inflation_radius_m: 0.25
-    
-    # Threshold for occupancy grid
-    # Cells with occupancy >= this value are considered occupied
+    map_topic: "/map"
+    robot_pose_topic: "/pf/pose/odom"
+    waypoints_topic: "/interface/waypoints"
+    path_topic: "/planning/path"
+
     occupied_threshold: 50
-    
-    # Whether to treat unknown cells (value = -1) as occupied
     unknown_is_occupied: true
+    inflation_radius_m: 0.3
 
+    allow_diagonal: true
+    astar_timeout_ms: 300
 
-path_planning_nn_2opt_node:
-  ros__parameters:
-    two_opt_first_improvement: true
-    two_opt_max_iter: 5000
-    use_waypoint_order: true
-    
-    
-smoothing_node:
-  ros__parameters:
-    path_spacing: 0.01
+    resample_ds: 0.10
+    min_path_points: 2
+
+    smoothing_enable: true
+    smoothing_alpha: 0.1
+    smoothing_beta: 0.3
+    smoothing_iterations: 50
