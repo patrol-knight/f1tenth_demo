@@ -252,9 +252,9 @@ class PurePursuitNode(Node):
         self._cte_m = compute_cross_track_error(self._path_xy, curr_x, curr_y)
         self._max_abs_cte_m = max(self._max_abs_cte_m, abs(self._cte_m))
 
-        self.get_logger().info(
-            f"CTE={self._cte_m * 100.0:.2f} cm, max CTE={self._max_abs_cte_m * 100.0:.2f} cm"
-        )
+        # self.get_logger().info(
+        #     f"CTE={self._cte_m * 100.0:.2f} cm, max CTE={self._max_abs_cte_m * 100.0:.2f} cm"
+        # )
 
         goal_pt = self._path_xy[-1]
 

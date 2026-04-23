@@ -149,7 +149,7 @@ class ParticleFiler(Node):
         self.initialization_converged = False
         self.INIT_COV_X_THRESHOLD = 0.005
         self.INIT_COV_Y_THRESHOLD = 0.005
-        self.INIT_COV_YAW_THRESHOLD = 0.0005
+        self.INIT_COV_YAW_THRESHOLD = 0.001
 
         # initialize the state
         self.smoothing = Utils.CircularArray(10)
