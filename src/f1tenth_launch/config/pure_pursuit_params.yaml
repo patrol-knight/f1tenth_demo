@@ -3,4 +3,4 @@ pure_pursuit_node:
     lookahead: 0.1
     wheelbase: 0.30
     control_rate_hz: 20.0
-    max_steer_deg: 30.0
+    max_steer_deg: 0.0

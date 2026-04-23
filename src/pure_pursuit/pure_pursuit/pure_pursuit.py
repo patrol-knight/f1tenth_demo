@@ -162,10 +162,10 @@ class PurePursuitNode(Node):
         super().__init__("pure_pursuit_node")
 
         # ---- Parameters ----
-        self.declare_parameter("lookahead", 1.0)       # meters (or your grid units)
+        self.declare_parameter("lookahead", 0.6)       # meters (or your grid units)
         self.declare_parameter("wheelbase", 0.30)      # meters
         self.declare_parameter("control_rate_hz", 20.0)
-        self.declare_parameter("max_steer_deg", 30.0)  # clamp output
+        self.declare_parameter("max_steer_deg", 25.0)  # clamp output
 
         self.lookahead: float = float(self.get_parameter("lookahead").value)
         self.wheelbase: float = float(self.get_parameter("wheelbase").value)
@@ -179,7 +179,7 @@ class PurePursuitNode(Node):
         self._max_abs_cte_m: float = 0.0
 
         # ---- ROS interfaces ----
-        self._path_sub = self.create_subscription(Path, "/planning/raw_path", self._on_path, 10)
+        self._path_sub = self.create_subscription(Path, "/planning/path", self._on_path, 10)
         self._state_sub = self.create_subscription(Odometry, "/pf/pose/odom", self._on_odom, 10)
         self._drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
         self._marker_pub = self.create_publisher(Marker, "/viz/lookahead_point", 10)
@@ -295,7 +295,7 @@ class PurePursuitNode(Node):
             drive_msg.drive.speed = 0.0
             drive_msg.drive.steering_angle = 0.0
         else:
-            drive_msg.drive.speed = 1.0
+            drive_msg.drive.speed = 0.7
             drive_msg.drive.steering_angle = delta_rad
 
         self._drive_pub.publish(drive_msg)

@@ -28,6 +28,7 @@ setup(
             'planner_nn_2opt = path_planning.planner_nn_2opt:main',
             'map_inflator = path_planning.map_inflator:main',
             'smoothing = path_planning.smoothing:main',
+            'planner = path_planning.planner:main'
         ],
     },
 )
