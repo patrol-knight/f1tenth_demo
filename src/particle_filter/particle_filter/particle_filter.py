@@ -38,7 +38,7 @@ from tf2_ros import TransformBroadcaster
 import tf_transformations
 
 # messages
-from std_msgs.msg import String, Header, Float32MultiArray
+from std_msgs.msg import String, Header, Float32, Float32MultiArray
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point, Pose, PoseStamped, PoseArray, Quaternion, PolygonStamped, Polygon, Point32, PoseWithCovarianceStamped, PointStamped, TransformStamped
@@ -144,6 +144,13 @@ class ParticleFiler(Node):
         self.particles = np.zeros((self.MAX_PARTICLES, 3))
         self.weights = np.ones(self.MAX_PARTICLES) / float(self.MAX_PARTICLES)
 
+        # track how long localization takes to converge after receiving an initial pose
+        self.initialization_start_time = None
+        self.initialization_converged = False
+        self.INIT_COV_X_THRESHOLD = 0.005
+        self.INIT_COV_Y_THRESHOLD = 0.005
+        self.INIT_COV_YAW_THRESHOLD = 0.0005
+
         # initialize the state
         self.smoothing = Utils.CircularArray(10)
         self.timer = Utils.Timer(10)
@@ -162,6 +169,7 @@ class ParticleFiler(Node):
         self.particle_pub = self.create_publisher(PoseArray, '/pf/viz/particles', 1)
         self.pub_fake_scan = self.create_publisher(LaserScan, '/pf/viz/fake_scan', 1)
         self.rect_pub = self.create_publisher(PolygonStamped, '/pf/viz/poly1', 1)
+        self.ess_score_pub = self.create_publisher(Float32, '/pf/metrics/ess_score', 1)
 
         if self.PUBLISH_ODOM:
             self.odom_pub = self.create_publisher(Odometry, '/pf/pose/odom', 1)
@@ -395,6 +403,8 @@ class ParticleFiler(Node):
         self.particles[:,0] = pose.position.x + np.random.normal(loc=0.0,scale=0.5,size=self.MAX_PARTICLES)
         self.particles[:,1] = pose.position.y + np.random.normal(loc=0.0,scale=0.5,size=self.MAX_PARTICLES)
         self.particles[:,2] = Utils.quaternion_to_angle(pose.orientation) + np.random.normal(loc=0.0,scale=0.4,size=self.MAX_PARTICLES)
+        self.initialization_start_time = time.time()
+        self.initialization_converged = False
         self.state_lock.release()
 
     def initialize_global(self):
@@ -646,6 +656,46 @@ class ParticleFiler(Node):
         # returns the expected value of the pose given the particle distribution
         return np.dot(self.particles.transpose(), self.weights)
 
+    def publish_ess_score(self):
+        '''
+        Publish the normalized effective sample size as a particle health score.
+
+        A value near 1.0 means particle weights are evenly distributed. A value near 0.0 means
+        most probability mass is concentrated in a small number of particles.
+        '''
+        weight_squared_sum = np.sum(np.square(self.weights))
+        if weight_squared_sum <= 0.0:
+            return
+
+        ess = 1.0 / weight_squared_sum
+        ess_score = np.clip(ess / float(self.MAX_PARTICLES), 0.0, 1.0)
+
+        msg = Float32()
+        msg.data = float(ess_score)
+        self.ess_score_pub.publish(msg)
+
+    def check_initialization_runtime(self):
+        '''
+        Print the elapsed initialization time once particle covariance has converged.
+        '''
+        if self.initialization_start_time is None or self.initialization_converged:
+            return
+
+        cov_mat = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights)
+        cov_x = cov_mat[0, 0]
+        cov_y = cov_mat[1, 1]
+        cov_yaw = cov_mat[2, 2]
+
+        if (cov_x <= self.INIT_COV_X_THRESHOLD and
+                cov_y <= self.INIT_COV_Y_THRESHOLD and
+                cov_yaw <= self.INIT_COV_YAW_THRESHOLD):
+            runtime = time.time() - self.initialization_start_time
+            self.initialization_converged = True
+            self.get_logger().info(
+                'Initialization runtime: {:.3f} sec '
+                '(cov_x={:.6f}, cov_y={:.6f}, cov_yaw={:.6f})'.format(
+                    runtime, cov_x, cov_y, cov_yaw))
+
     def update(self):
         '''
         Apply the MCL function to update particle filter state. 
@@ -670,6 +720,8 @@ class ParticleFiler(Node):
 
                 # compute the expected value of the robot pose
                 self.inferred_pose = self.expected_pose()
+                self.publish_ess_score()
+                self.check_initialization_runtime()
                 self.state_lock.release()
                 t2 = time.time()
 
