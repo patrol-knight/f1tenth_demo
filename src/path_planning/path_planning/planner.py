@@ -125,7 +125,12 @@ class Planner(Node):
             return
 
         if len(msg.poses) < 1:
-            self.get_logger().warn("Need at least 1 waypoint.")
+            self.get_logger().warn("Received empty waypoints.")
+            empty_path = Path()
+            empty_path.header.frame_id = "map"
+            empty_path.header.stamp = self.get_clock().now().to_msg()
+            empty_path.poses = []
+            self.path_pub.publish(empty_path)
             return
 
         world_points = []
